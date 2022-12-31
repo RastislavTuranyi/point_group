@@ -3,7 +3,6 @@ pub mod utils;
 //pub mod point_groups;
 
 use crate::geometry::*;
-use crate::utils::*;
 
 /// Finds the point group of a single molecule
 /// 
@@ -28,31 +27,27 @@ pub fn find_point_group(coordinates: Vec<Point>, precision: u16, tolerance: f64)
     let mut rotation_axes = get_rotation_axes(&coordinates, centre_of_symmetry, precision, tolerance);
     let mut rotations = compute_rotations(&rotation_axes, &coordinates, tolerance);
 
-    let mut highest_order_rotation = rotations.iter().max()
-        .expect("The rotations can only be empty if there are no particles in the object").clone();
-
     let planar = has_planar_element(&coordinates, centre_of_symmetry, tolerance);
     match planar {
         Planarity::Planar(plane) | Planarity::PlanarElement(plane) => {
             let line = Line::new(centre_of_symmetry, plane.normal);
             let rot = compute_rotations(&vec![line], &coordinates, tolerance)[0];
 
-            if !is_equivalent_axis(&rotation_axes, line, tolerance)  {
-                rotation_axes.push(line);
-                rotations.push(rot);
-                highest_order_rotation = rotations.iter().max()
-                    .expect("The rotations can only be empty if there are no particles in the object").clone();
-            } else if rot > highest_order_rotation {
-                rotation_axes.push(line);
-                rotations.push(rot);
-                highest_order_rotation = rot;
-            }
+            rotation_axes.push(line);
+            rotations.push(rot);
         },
         Planarity::None => ()
     }
 
     println!("PLANAR = {:?}", &planar);
-    
+
+    let (rotation_axes, rotations) = filter_rotations(rotation_axes, rotations, tolerance);
+
+    let highest_order_rotation = match rotations.iter().max() {
+        Some(value) => *value,
+        None => 1
+    };
+
     //println!("{:?}", &rotation_axes);
     println!("");
     println!("{}, {:?}, highest = {}", rotations.len(), rotations, highest_order_rotation);
@@ -63,11 +58,11 @@ pub fn find_point_group(coordinates: Vec<Point>, precision: u16, tolerance: f64)
             println!("SIMILAR {:?}", axis)
         };
 
-        println!("{:?} {:?}", deviation_from_rotation_symmetry(&coordinates, *axis, 2.0).iter().fold(0.0, |max, val| if val > &max {*val} else {max}), axis);
+        /* println!("{:?} {:?}", deviation_from_rotation_symmetry(&coordinates, *axis, 2.0).iter().fold(0.0, |max, val| if val > &max {*val} else {max}), axis);
 
         if axis.vector.is_approx_k_multiple(Vector { x: 0.8808450198738458, y: 0.4532289546188045, z: -0.13673172879251713 }, tolerance) {
             print!("THIS ONE!!!!!!!!!!!!!!!!!!!!!!!");
-        }
+        } */
 
         /* for r in rotation_axes[1..].iter() {
             println!("{}", axis.approx_eq(r, tolerance))
@@ -119,7 +114,11 @@ pub fn find_point_group(coordinates: Vec<Point>, precision: u16, tolerance: f64)
             None => ()
         };
 
-        let sigma_v = get_vertical_planes(&coordinates, &principal_axis, precision, planar, tolerance);
+        let sigma_v = if highest_order_rotation == 2 {
+            get_d2d_vertical_planes(&coordinates, &rotation_axes, precision, planar, tolerance)
+        } else {
+            get_vertical_planes(&coordinates, &principal_axis, precision, planar, tolerance)
+        };
         println!("{:?} {}", &sigma_v, sigma_v.len());
 
         if (sigma_v.len() as u32) == highest_order_rotation {
@@ -214,22 +213,11 @@ fn get_rotation_axes(coordinates: &Vec<Point>, centre_of_symmetry: Point, precis
     };
 
     // Create lines between the centre of symmetry and each (pseudo) atom
-    'outer: for point in coords {
+    for point in coords {
         let line = match Line::from_points_tolerance_normalised(centre_of_symmetry, point, tolerance) {
             Some(line) => line.normalise(),
             None => continue
         };
-
-        /* if line.approx_eq(&l, tolerance) {
-            println!("first {:?} {}", line, line.vector.angle_degrees(l.vector))
-        } */
-
-        // Do not add this axis if an identical one already exists
-        for ax in axes.iter() {
-            if ax.fast_approx_eq(line, tolerance) {
-                continue 'outer
-            }
-        }
 
         axes.push(line)
     }
@@ -239,7 +227,7 @@ fn get_rotation_axes(coordinates: &Vec<Point>, centre_of_symmetry: Point, precis
 
 
 
-fn is_equivalent_axis(axes: &Vec<Line>, line: Line, tolerance: f64) -> bool {
+fn _is_equivalent_axis(axes: &Vec<Line>, line: Line, tolerance: f64) -> bool {
     for ax in axes {
         if ax.approx_eq(&line, tolerance) {
             return true
@@ -494,18 +482,47 @@ pub fn compute_rotations(axes: &Vec<Line>, coordinates: &Vec<Point>, tolerance: 
                 }
             } else {
                 if !is_rotation_viable(&coordinates, point, axis, rot, tolerance) {
-                       rot = recompute_baseline_rotation(coordinates, point, axis, rot, tolerance);
+                    rot = recompute_baseline_rotation(coordinates, point, axis, rot, tolerance);
 
-                       if rot == 1.0 {
-                        break
-                       }
+                    if rot == 1.0 {
+                    break
                     }
                 }
             }
-        rotations.push(rot as u32);
         }
+            
+        rotations.push(rot as u32);
+    }
 
     return rotations
+}
+
+
+fn filter_rotations(axes: Vec<Line>, rotations: Vec<u32>, tolerance: f64) -> (Vec<Line>, Vec<u32>) {
+    let length = rotations.len();
+    let mut nonzero_axes = Vec::with_capacity(length);
+    let mut nonzero_rots = Vec::with_capacity(length);
+
+    'outer: for (i, (axis, rot)) in axes.iter().zip(rotations.iter()).enumerate() {
+        if *rot == 1 {
+            continue;
+        }
+
+        for (comparison_axis, comparison_rot) in axes[i+1..].iter().zip(rotations[i+1..].iter()) {
+            if *rot == 1 {
+                continue;
+            }
+
+            if axis.fast_approx_eq(*comparison_axis, tolerance) && rot <= comparison_rot {
+                continue 'outer
+            }
+        }
+
+        nonzero_axes.push(*axis);
+        nonzero_rots.push(*rot);
+    }
+
+    return (nonzero_axes, nonzero_rots)
 }
 
 
@@ -693,6 +710,19 @@ fn get_vertical_planes(coordinates: &Vec<Point>, principal_axis: &Line, precisio
     }
 
     return planes
+}
+
+
+fn get_d2d_vertical_planes(coordinates: &Vec<Point>, axes: &Vec<Line>, precision: u16, 
+    planar: Planarity, tolerance: f64) -> Vec<Plane> {
+    for axis in axes {
+        let planes = get_vertical_planes(&coordinates, axis, precision, planar, tolerance);
+        if planes.len() == 2 {
+            return planes
+        }
+    }
+
+    return Vec::with_capacity(0)
 }
 
 

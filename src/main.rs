@@ -127,4 +127,43 @@ fn main() {
 
     println!("{:?}", Vector { x: -0.17852754387578762, y: 0.5944347772145868, z: 0.7840760241937789 }.rotate_vector(vectors[1], 4.0));
 
+    println!("{:?}", Vector { x: 2.7812266816623596e-16, y: 1.850371707708594e-16, z: 1.0 }.is_approx_k_multiple(Vector { x: 7.401486830834377e-17, y: -1.9070629087032735e-17, z: 1.0 }, 1e-10))
+
+}
+
+fn filter_rotations(axes: &mut Vec<Line>, rotations: &mut Vec<u32>, tolerance: f64) {
+    let mut to_remove = Vec::with_capacity(rotations.len());
+
+    'outer: for (i, (axis, rot)) in axes.iter().zip(rotations.iter()).enumerate() {
+        for removed in to_remove.iter() {
+            if i == *removed {
+                continue 'outer
+            }
+        }
+
+        for (j, (comparison_axis, comparison_rot)) in axes[i+1..].iter().zip(rotations[i+1..].iter()).enumerate() {
+            for removed in to_remove.iter() {
+                if j == *removed {
+                    continue 'outer
+                }
+            }
+
+            if axis.fast_approx_eq(*comparison_axis, tolerance) {
+                if rot < comparison_rot {
+                    to_remove.push(i);
+                    continue 'outer
+                } else {
+                    to_remove.push(j+i+1);
+                }
+            }
+        }
+    }
+
+    to_remove.sort();
+    println!("{:?}", to_remove);
+    println!("{:?}", rotations);
+    for (i, removed) in to_remove.iter().enumerate() {
+        axes.remove(removed.checked_sub(i).expect("removed should always be greater than i"));
+        rotations.remove(removed.checked_sub(i).expect("removed should always be greater than i"));
+    }
 }
