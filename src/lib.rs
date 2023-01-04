@@ -393,7 +393,7 @@ pub fn is_planar(coordinates: &Vec<Point>, centre_of_symmetry: Point, tolerance:
 
 
 
-fn has_planar_element(coordinates: &Vec<Point>, centre_of_symmetry: Point, tolerance: f64) -> Planarity {
+pub fn has_planar_element(coordinates: &Vec<Point>, centre_of_symmetry: Point, tolerance: f64) -> Planarity {
     let plane = match get_valid_plane(&coordinates, centre_of_symmetry, tolerance) {
         Some(plane) => plane,
         None => return Planarity::None
@@ -412,7 +412,7 @@ fn has_planar_element(coordinates: &Vec<Point>, centre_of_symmetry: Point, toler
 
 
 #[derive(Debug, Copy, Clone)]
-enum Planarity {
+pub enum Planarity {
     Planar(Plane),
     PlanarElement(Plane),
     None
@@ -446,7 +446,7 @@ fn find_best_plane(coordinates: &Vec<Point>, plane: Plane, tolerance: f64) -> (P
     let mut new_length;
 
     loop {
-        let plane = match Plane::from_multiple_points2(&points_on_plane, tolerance) {
+        let plane = match Plane::from_multiple_points(&points_on_plane, tolerance) {
             Some(plane) => plane,
             None => return (plane, points_on_plane, length)
         };
@@ -471,7 +471,7 @@ pub fn compute_rotations(axes: &Vec<Line>, coordinates: &Vec<Point>, tolerance: 
 
         for point in coordinates {
             if rot == 0.0 {
-                if point.distance_from_line(*axis) < tolerance {
+                if point.distance(*axis) < tolerance {
                     continue
                 }
 

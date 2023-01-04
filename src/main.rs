@@ -69,7 +69,7 @@ fn main() {
 
     //println!("{}", Line { point: Point { x: -1.3466360139166669, y: 2.7197999955000007, z: 3.592181557 }, vector: Vector { x: 0.49907284291666687, y: 0.49500360949999944, z: -0.02694136250000012 } }.approx_eq(&Line { point: Point { x: -1.3466360139166669, y: 2.7197999955000007, z: 3.592181557 }, vector: Vector { x: 1.6516119229166668, y: 1.5932588154999996, z: -0.08980453999999982 } }, 0.075));
     let coords = vec!(Point::new(5.408387870, 2.392487448, 5.455600003), Point::new(1.839182104, 1.763012487, 5.050283634), Point::new(6.793378715, 2.947163631, 5.237182883), Point::new(0.454191259, 1.208336304, 5.268700754), Point::new(6.076129674, 4.051944932, 4.343447528), Point::new(1.171440299, 0.103555003, 6.162436109), Point::new(4.816795539, 3.292984357, 4.629627883), Point::new(2.430774435, 0.862515578, 5.876255753), Point::new(3.493009179, 3.502754027, 4.174513002), Point::new(3.754560795, 0.652745908, 6.331370634), Point::new(3.006664300, 4.530076637, 3.237177884), Point::new(1.559416123, 3.833614948, 3.414097078), Point::new(5.688153851, 0.321884987, 7.091786558), Point::new(4.955958695, 1.248727753, 6.194373847), Point::new(2.291611279, 2.906772182, 4.311509790), Point::new(4.240905674, -0.374576702, 7.268705753), Point::new(7.643114730, 2.116977907, 4.594958350), Point::new(-0.395544756, 2.038522028, 5.910925287), Point::new(7.439200466, 3.390971107, 6.329479512), Point::new(-0.191630492, 0.764528829, 4.176404125), Point::new(6.459761115, 4.080950329, 3.068138157), Point::new(0.787808859, 0.074549606, 7.437745480), Point::new(6.155181702, 5.283468959, 4.817262916), Point::new(3.505241767, 4.458518844, 1.961238399), Point::new(3.098907550, 5.827174337, 3.599525698), Point::new(0.644863621, 4.621497945, 3.960718174), Point::new(1.047888354, 3.331048662, 2.289757353), Point::new(6.199681620, 0.824451273, 8.216126284), Point::new(1.092388271, -1.127969024, 5.688620720), Point::new(6.602706353, -0.465998010, 6.545165463), Point::new(4.148662424, -1.671674402, 6.906357939), Point::new(3.742328206, -0.303018909, 8.544645237));
-
+    let cos = get_centre_of_symmetry(&coords);
     /* let planar = is_planar(&coords, 0.1);
 
     match planar {
@@ -81,10 +81,11 @@ fn main() {
 
     println!("{:?}", shortest_atom_distance(&coords));
 
-    //println!("{:?}", deviation_from_reflection_symmetry(&coords, Plane::new(get_centre_of_symmetry(&coords), Vector { x: 0.6913535661572475, y: -0.10757560458888338, z: -0.7144632501808562 }).expect("msg")));
+    println!("{:?}", has_planar_element(&coords, cos, 0.29));
+
+    println!("{:?}", deviation_from_reflection_symmetry(&coords, Plane { point: Point { x: 3.6237849869375003, y: 2.0777499675000004, z: 5.252941818312499 }, normal: Vector { x: -0.17852754387578762, y: 0.5944347772145868, z: 0.7840760241937789 } }));
     //println!("{:?}", has_plane_reflection_symmetry(&coords, &Plane::new(get_centre_of_symmetry(&coords), lines[2].vector).expect("msg"), 0.2));
     //println!("{:?} {:?}", points_into_coordinates(coords), lines[2].compute_point(10.0))
-    let cos = get_centre_of_symmetry(&coords);
 
     let deviations = deviation_from_plane(&coords, Plane::new(cos, Vector { x: -0.17852754387578762, y: 0.5944347772145868, z: 0.7840760241937789 }).unwrap());
     //println!("{:?} <- {:?}", deviations.iter().fold(0.0, |max, val| if val > &max {*val} else {max}), deviations);
@@ -118,52 +119,4 @@ fn main() {
         } */
         println!("{:?}", v.angle_degrees(Vector { x: 1.2527473282125494, y: -0.013485584329648914, z: -1.5910145769789892 }))
     } */
-
-    let vectors = vec![Vector { x: -0.3170190199757357, y: -0.7878488084726339, z: 0.5280087082254186 },
-        Vector { x: 0.4357600037633384, y: -0.6632955090785005, z: 0.6084014190947192 },
-        Vector { x: 0.9276890164805255, y: -0.1530736275684151, z: 0.3405312808604249 }];
-
-    println!("1-2 {} 1-3 {} 2-3 {}", vectors[0].angle_degrees(vectors[1]), vectors[0].angle_degrees(vectors[2]), vectors[1].angle_degrees(vectors[2]));
-
-    println!("{:?}", Vector { x: -0.17852754387578762, y: 0.5944347772145868, z: 0.7840760241937789 }.rotate_vector(vectors[1], 4.0));
-
-    println!("{:?}", Vector { x: 2.7812266816623596e-16, y: 1.850371707708594e-16, z: 1.0 }.is_approx_k_multiple(Vector { x: 7.401486830834377e-17, y: -1.9070629087032735e-17, z: 1.0 }, 1e-10))
-
-}
-
-fn filter_rotations(axes: &mut Vec<Line>, rotations: &mut Vec<u32>, tolerance: f64) {
-    let mut to_remove = Vec::with_capacity(rotations.len());
-
-    'outer: for (i, (axis, rot)) in axes.iter().zip(rotations.iter()).enumerate() {
-        for removed in to_remove.iter() {
-            if i == *removed {
-                continue 'outer
-            }
-        }
-
-        for (j, (comparison_axis, comparison_rot)) in axes[i+1..].iter().zip(rotations[i+1..].iter()).enumerate() {
-            for removed in to_remove.iter() {
-                if j == *removed {
-                    continue 'outer
-                }
-            }
-
-            if axis.fast_approx_eq(*comparison_axis, tolerance) {
-                if rot < comparison_rot {
-                    to_remove.push(i);
-                    continue 'outer
-                } else {
-                    to_remove.push(j+i+1);
-                }
-            }
-        }
-    }
-
-    to_remove.sort();
-    println!("{:?}", to_remove);
-    println!("{:?}", rotations);
-    for (i, removed) in to_remove.iter().enumerate() {
-        axes.remove(removed.checked_sub(i).expect("removed should always be greater than i"));
-        rotations.remove(removed.checked_sub(i).expect("removed should always be greater than i"));
-    }
 }

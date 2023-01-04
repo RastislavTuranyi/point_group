@@ -159,8 +159,7 @@ pub fn deviation_from_reflection_symmetry(coordinates: &Vec<Point>, plane: Plane
     let mut deviation = Vec::with_capacity(coordinates.len());
 
     for point in coordinates {
-        println!("{} {:?} -> {:?}", point.is_approx_on_plane(plane, 0.1), point, point.reflect(plane));
-        deviation.push(distance_from_closest_point(&coordinates, point.reflect(plane)))
+        deviation.push(distance_from_closest_point(&coordinates, plane.reflect_point(*point)))
     }
 
     return deviation
