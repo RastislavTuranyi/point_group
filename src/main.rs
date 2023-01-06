@@ -68,7 +68,23 @@ fn main() {
     //print!("{:?}", result);
 
     //println!("{}", Line { point: Point { x: -1.3466360139166669, y: 2.7197999955000007, z: 3.592181557 }, vector: Vector { x: 0.49907284291666687, y: 0.49500360949999944, z: -0.02694136250000012 } }.approx_eq(&Line { point: Point { x: -1.3466360139166669, y: 2.7197999955000007, z: 3.592181557 }, vector: Vector { x: 1.6516119229166668, y: 1.5932588154999996, z: -0.08980453999999982 } }, 0.075));
-    let coords = vec!(Point::new(5.408387870, 2.392487448, 5.455600003), Point::new(1.839182104, 1.763012487, 5.050283634), Point::new(6.793378715, 2.947163631, 5.237182883), Point::new(0.454191259, 1.208336304, 5.268700754), Point::new(6.076129674, 4.051944932, 4.343447528), Point::new(1.171440299, 0.103555003, 6.162436109), Point::new(4.816795539, 3.292984357, 4.629627883), Point::new(2.430774435, 0.862515578, 5.876255753), Point::new(3.493009179, 3.502754027, 4.174513002), Point::new(3.754560795, 0.652745908, 6.331370634), Point::new(3.006664300, 4.530076637, 3.237177884), Point::new(1.559416123, 3.833614948, 3.414097078), Point::new(5.688153851, 0.321884987, 7.091786558), Point::new(4.955958695, 1.248727753, 6.194373847), Point::new(2.291611279, 2.906772182, 4.311509790), Point::new(4.240905674, -0.374576702, 7.268705753), Point::new(7.643114730, 2.116977907, 4.594958350), Point::new(-0.395544756, 2.038522028, 5.910925287), Point::new(7.439200466, 3.390971107, 6.329479512), Point::new(-0.191630492, 0.764528829, 4.176404125), Point::new(6.459761115, 4.080950329, 3.068138157), Point::new(0.787808859, 0.074549606, 7.437745480), Point::new(6.155181702, 5.283468959, 4.817262916), Point::new(3.505241767, 4.458518844, 1.961238399), Point::new(3.098907550, 5.827174337, 3.599525698), Point::new(0.644863621, 4.621497945, 3.960718174), Point::new(1.047888354, 3.331048662, 2.289757353), Point::new(6.199681620, 0.824451273, 8.216126284), Point::new(1.092388271, -1.127969024, 5.688620720), Point::new(6.602706353, -0.465998010, 6.545165463), Point::new(4.148662424, -1.671674402, 6.906357939), Point::new(3.742328206, -0.303018909, 8.544645237));
+    let coords = vec!(Point::new(5.408387870, 2.392487448, 5.455600003), 
+    Point::new(1.839182104, 1.763012487, 5.050283634), Point::new(6.793378715, 2.947163631, 5.237182883), 
+    Point::new(0.454191259, 1.208336304, 5.268700754), Point::new(6.076129674, 4.051944932, 4.343447528), 
+    Point::new(1.171440299, 0.103555003, 6.162436109), Point::new(4.816795539, 3.292984357, 4.629627883), 
+    Point::new(2.430774435, 0.862515578, 5.876255753), Point::new(3.493009179, 3.502754027, 4.174513002), 
+    Point::new(3.754560795, 0.652745908, 6.331370634), Point::new(3.006664300, 4.530076637, 3.237177884), 
+    Point::new(1.559416123, 3.833614948, 3.414097078), Point::new(5.688153851, 0.321884987, 7.091786558), 
+    Point::new(4.955958695, 1.248727753, 6.194373847), Point::new(2.291611279, 2.906772182, 4.311509790), 
+    Point::new(4.240905674, -0.374576702, 7.268705753), Point::new(7.643114730, 2.116977907, 4.594958350), 
+    Point::new(-0.395544756, 2.038522028, 5.910925287), Point::new(7.439200466, 3.390971107, 6.329479512), 
+    Point::new(-0.191630492, 0.764528829, 4.176404125), Point::new(6.459761115, 4.080950329, 3.068138157), 
+    Point::new(0.787808859, 0.074549606, 7.437745480), Point::new(6.155181702, 5.283468959, 4.817262916), 
+    Point::new(3.505241767, 4.458518844, 1.961238399), Point::new(3.098907550, 5.827174337, 3.599525698), 
+    Point::new(0.644863621, 4.621497945, 3.960718174), Point::new(1.047888354, 3.331048662, 2.289757353), 
+    Point::new(6.199681620, 0.824451273, 8.216126284), Point::new(1.092388271, -1.127969024, 5.688620720), 
+    Point::new(6.602706353, -0.465998010, 6.545165463), Point::new(4.148662424, -1.671674402, 6.906357939), 
+    Point::new(3.742328206, -0.303018909, 8.544645237));
     let cos = get_centre_of_symmetry(&coords);
     /* let planar = is_planar(&coords, 0.1);
 
@@ -77,24 +93,24 @@ fn main() {
         None => println!("{:?}", deviation_from_plane(&coords, Plane::from_three_points(coords[0], coords[1], coords[3]).expect("msg")))
     } */
 
-    //println!("{:?}", deviation_from_rotation_symmetry(&coords, Line { point: Point { x: 14.761766726, y: 15.148321191600001, z: 8.782508149 }, vector: Vector { x: 2.1966905637164165, y: 4.257967944102729, z: -2.310372869096168 } }, 4.0));
-
     println!("{:?}", shortest_atom_distance(&coords));
 
-    println!("{:?}", has_planar_element(&coords, cos, 0.29));
+    //println!("{:?}", has_planar_element(&coords, cos, 0.29));
 
-    println!("{:?}", deviation_from_reflection_symmetry(&coords, Plane { point: Point { x: 3.6237849869375003, y: 2.0777499675000004, z: 5.252941818312499 }, normal: Vector { x: -0.17852754387578762, y: 0.5944347772145868, z: 0.7840760241937789 } }));
     //println!("{:?}", has_plane_reflection_symmetry(&coords, &Plane::new(get_centre_of_symmetry(&coords), lines[2].vector).expect("msg"), 0.2));
     //println!("{:?} {:?}", points_into_coordinates(coords), lines[2].compute_point(10.0))
 
-    let deviations = deviation_from_plane(&coords, Plane::new(cos, Vector { x: -0.17852754387578762, y: 0.5944347772145868, z: 0.7840760241937789 }).unwrap());
-    //println!("{:?} <- {:?}", deviations.iter().fold(0.0, |max, val| if val > &max {*val} else {max}), deviations);
-    //println!("{:?}", deviation_from_plane(&coords, Plane::from_three_points(coords[0], coords[1], coords[3]).unwrap()));
+    let plane = Plane { point: Point { x: 3.62378498690625, y: 2.07774996753125, z: 5.252941818343749 }, normal: Vector { x: 0.18750816742172502, y: -0.6003844436642961, z: -0.7774182960003322 } };
+    //let deviations = deviation_from_plane(&coords, plane);
+    let deviations = deviation_from_reflection_symmetry(&coords, plane);
+    println!("{:?} <- {:?}", deviations.iter().fold(0.0, |max, val| if val > &max {*val} else {max}), deviations);
 
-    let vector = Plane::from_three_points(cos, coords[6], coords[8]).unwrap().normal.normalise();
-    let vector = Vector { x: 0.840707187108094, y: 0.5066674461155988, z: -0.1910484875404488 };
+    println!("");
+
+    //let vector = Plane::from_three_points(cos, coords[0], coords[6]).unwrap().normal.normalise();
+    let vector = Vector { x: -0.8150923639767539, y: -0.4421245865204166, z: -0.3743665158383399 };
     let deviations = deviation_from_rotation_symmetry(&coords, Line::new(cos, vector), 2.0);
-    println!("{:?} <- {:?}, {:?}", deviations.iter().fold(0.0, |max, val| if val > &max {*val} else {max}), deviations, vector);
+    //println!("{:?} <- {:?}, {:?}", deviations.iter().fold(0.0, |max, val| if val > &max {*val} else {max}), deviations, vector);
     println!("");
     /* let pp = Plane::from_three_points(cos, coords[6], coords[8]).unwrap();
     for (i, p1) in coords.iter().enumerate() {
@@ -107,7 +123,6 @@ fn main() {
             
         }
     } */
-    //println!("{:?}", deviation_from_rotation_symmetry(&coords, Line::from_points(cos, Point::new(10.528230482, 7.339499950, 4.274270573)).unwrap(), 2.0));
 
     //Line { point: Point { x: 7.1446236518, y: 9.656128203933331, z: 4.7408198414000005 }, vector: Vector { x: -0.3112557392670835, y: 0.5601211141467458, z: 1.8173851621853414 } }
     /* for (i, c) in coords.iter().enumerate() {

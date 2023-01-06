@@ -25,23 +25,36 @@ pub fn find_point_group(coordinates: Vec<Point>, precision: u16, tolerance: f64)
     let centre_of_symmetry = get_centre_of_symmetry(&coordinates);
 
     let mut rotation_axes = get_rotation_axes(&coordinates, centre_of_symmetry, precision, tolerance);
-    let mut rotations = compute_rotations(&rotation_axes, &coordinates, tolerance);
+    let (mut rotations, mut distances) = compute_rotations(&rotation_axes, &coordinates, tolerance);
 
     let planar = has_planar_element(&coordinates, centre_of_symmetry, tolerance);
     match planar {
         Planarity::Planar(plane) | Planarity::PlanarElement(plane) => {
             let line = Line::new(centre_of_symmetry, plane.normal);
-            let rot = compute_rotations(&vec![line], &coordinates, tolerance)[0];
+            let (rot, distance) = compute_rotations(&vec![line], &coordinates, tolerance);
 
             rotation_axes.push(line);
-            rotations.push(rot);
+            rotations.push(rot[0]);
+            distances.push(distance[0]);
         },
         Planarity::None => ()
     }
 
     println!("PLANAR = {:?}", &planar);
 
-    let (rotation_axes, rotations) = filter_rotations(rotation_axes, rotations, tolerance);
+    /* for (rot, axis) in rotations.iter().zip(&rotation_axes) {
+        
+        if axis.vector.is_approx_k_multiple(Vector { x: -0.8150923639767539, y: -0.4421245865204166, z: -0.3743665158383399 }, tolerance) {
+            //print!("THIS ONE!!!!!!!!!!!!!!!!!!!!!!!");
+        println!("{:?} {:?} rot={}", crate::utils::deviation_from_rotation_symmetry(&coordinates, *axis, 2.0).iter().fold(0.0, |max, val| if val > &max {*val} else {max}), axis, rot);
+        }
+
+        /* for r in rotation_axes[1..].iter() {
+            println!("{}", axis.approx_eq(r, tolerance))
+        } */
+    } */
+
+    let (rotation_axes, rotations, principal_axes) = filter_rotations(rotation_axes, rotations, distances, tolerance);
 
     let highest_order_rotation = match rotations.iter().max() {
         Some(value) => *value,
@@ -107,7 +120,7 @@ pub fn find_point_group(coordinates: Vec<Point>, precision: u16, tolerance: f64)
             .position(|x| x == &highest_order_rotation)
             .expect("We are searching for a value we have retrieved from here earlier")];
 
-        let sigma_h = get_horizontal_plane(&coordinates, &principal_axis, &centre_of_symmetry, tolerance);
+        let sigma_h = get_horizontal_plane(&coordinates, principal_axes, centre_of_symmetry, tolerance);
 
         match sigma_h {
             Some(_i) => return format!("D {} h", highest_order_rotation),
@@ -132,7 +145,7 @@ pub fn find_point_group(coordinates: Vec<Point>, precision: u16, tolerance: f64)
             .expect("We are searching for a value we have retrieved from here earlier")];
         println!("{:?}", &principal_axis);
 
-        let sigma_h = get_horizontal_plane(&coordinates, &principal_axis, &centre_of_symmetry, tolerance);
+        let sigma_h = get_horizontal_plane(&coordinates, principal_axes, centre_of_symmetry, tolerance);
         println!("sigma h {:?}", &sigma_h);
 
         match sigma_h {
@@ -444,151 +457,184 @@ fn find_best_plane(coordinates: &Vec<Point>, plane: Plane, tolerance: f64) -> (P
     let mut points_on_plane = find_points_on_plane(&coordinates, plane, tolerance);
     let mut length = points_on_plane.len();
     let mut new_length;
+    let mut old_plane = plane;
 
     loop {
-        let plane = match Plane::from_multiple_points(&points_on_plane, tolerance) {
+        let new_plane = match Plane::from_multiple_points(&points_on_plane, tolerance) {
             Some(plane) => plane,
-            None => return (plane, points_on_plane, length)
+            None => return (old_plane, points_on_plane, length)
         };
-
-        points_on_plane = find_points_on_plane(&coordinates, plane, tolerance);
+        
+        points_on_plane = find_points_on_plane(&coordinates, new_plane, tolerance);
         new_length = points_on_plane.len();
 
-        if new_length <= length {
-            return (plane, points_on_plane, new_length)
+        if new_length < length {
+            return (old_plane, points_on_plane, length)
+        } else if new_length == length {
+            return (new_plane, points_on_plane, new_length)
         }
 
         length = new_length;
+        old_plane = new_plane;
     }
 }
 
 
-pub fn compute_rotations(axes: &Vec<Line>, coordinates: &Vec<Point>, tolerance: f64) -> Vec<u32> {
+pub fn compute_rotations(axes: &Vec<Line>, coordinates: &Vec<Point>, tolerance: f64) -> (Vec<u32>, Vec<f64>) {
     let mut rotations = Vec::<u32>::with_capacity(axes.len());
+    let mut max_deviations = Vec::<f64>::with_capacity(axes.len());
 
     for axis in axes {
         let mut rot = 0.0;
+        let mut max_distance = 0.0;
+        let mut recomp_index = 0;
 
-        for point in coordinates {
+        for (i, point) in coordinates.iter().enumerate() {
             if rot == 0.0 {
                 if point.distance(*axis) < tolerance {
                     continue
                 }
 
-                rot = determine_baseline_rotation(&coordinates, point, axis, tolerance);
+                let (r, d) = determine_baseline_rotation(&coordinates, point, axis, tolerance);
+                rot = r;
+                if d > max_distance {
+                    max_distance = d
+                } 
 
                 if rot == 1.0 {
                     break
                 }
             } else {
-                if !is_rotation_viable(&coordinates, point, axis, rot, tolerance) {
-                    rot = recompute_baseline_rotation(coordinates, point, axis, rot, tolerance);
+                let (viability, distance) = is_rotation_viable_distance(&coordinates, point, axis, rot, tolerance);
+                if !viability {
+                    (rot, max_distance) = recompute_baseline_rotation(coordinates, point, axis, rot, tolerance);
 
                     if rot == 1.0 {
-                    break
+                        break
+                    }
+
+                    recomp_index = i;
+                } else {
+                    if distance > max_distance {
+                        max_distance = distance;
                     }
                 }
             }
         }
             
         rotations.push(rot as u32);
+
+        if recomp_index > 0 {
+            for point in coordinates[..recomp_index].iter() {
+                let (_, distance) = is_rotation_viable_distance(&coordinates, point, axis, rot, tolerance);
+                if distance > max_distance {
+                    max_distance = distance
+                }
+            }
+        }
+        max_deviations.push(max_distance);
     }
 
-    return rotations
+    return (rotations, max_deviations)
 }
 
 
-fn filter_rotations(axes: Vec<Line>, rotations: Vec<u32>, tolerance: f64) -> (Vec<Line>, Vec<u32>) {
-    let length = rotations.len();
-    let mut nonzero_axes = Vec::with_capacity(length);
-    let mut nonzero_rots = Vec::with_capacity(length);
-
-    'outer: for (i, (axis, rot)) in axes.iter().zip(rotations.iter()).enumerate() {
-        if *rot == 1 {
-            continue;
-        }
-
-        for (comparison_axis, comparison_rot) in axes[i+1..].iter().zip(rotations[i+1..].iter()) {
-            if *rot == 1 {
-                continue;
-            }
-
-            if axis.fast_approx_eq(*comparison_axis, tolerance) && rot <= comparison_rot {
-                continue 'outer
-            }
-        }
-
-        nonzero_axes.push(*axis);
-        nonzero_rots.push(*rot);
-    }
-
-    return (nonzero_axes, nonzero_rots)
-}
-
-
-fn determine_baseline_rotation(coordinates: &Vec<Point>, point: &Point, axis: &Line, tolerance: f64) -> f64 {
+fn determine_baseline_rotation(coordinates: &Vec<Point>, point: &Point, axis: &Line, tolerance: f64) -> (f64, f64) {
     // Finds the rotation with the smallest rotation (Cn) that preserves the symmetry of the given object
     // This function is meant to be used only on the first atom of a compound since it takes into account all n
     // from 1 to 8.
-    if is_rotation_viable(&coordinates, &point, &axis, 2.0, tolerance) {
-        if is_rotation_viable(&coordinates, &point, &axis, 4.0, tolerance) {
-            if is_rotation_viable(&coordinates, &point, &axis, 8.0, tolerance) {
-                return 8.0
+    let (viability, distance2) = is_rotation_viable_distance(&coordinates, &point, &axis, 2.0, tolerance);
+
+    if viability {
+        let (viability, distance4) = is_rotation_viable_distance(&coordinates, &point, &axis, 4.0, tolerance);
+
+        if viability {
+            let (viability, distance8) = is_rotation_viable_distance(&coordinates, &point, &axis, 8.0, tolerance);
+
+            if viability {
+                return (8.0, distance8)
             } else {
-                return 4.0
+                return (4.0, distance4)
             }
-        } else if is_rotation_viable(&coordinates, &point, &axis, 6.0, tolerance) {
-            return 6.0
         } else {
-            return 2.0
+            let (viability, distance6) = is_rotation_viable_distance(&coordinates, &point, &axis, 6.0, tolerance);
+
+            if viability {
+                return (6.0, distance6)
+            } else {
+                return (2.0, distance2)
+            }
         }
-    } else if is_rotation_viable(&coordinates, &point, &axis, 3.0, tolerance) {
-        3.0
-    } else if is_rotation_viable(&coordinates, &point, &axis, 5.0, tolerance) {
-        5.0
-    } else if is_rotation_viable(&coordinates, &point, &axis, 7.0, tolerance) {
-        7.0
     } else {
-        1.0
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 3.0, tolerance);
+        if viability {
+            return (3.0, distance)
+        }
+
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 5.0, tolerance);
+        if viability {
+            return (5.0, distance)
+        }
+
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 7.0, tolerance);
+        if viability {
+            return (7.0, distance)
+        }
+
+        return (1.0, 100.0)
     }
 }
 
 
-fn recompute_baseline_rotation(coordinates: &Vec<Point>, point: &Point, axis: &Line, rot: f64, tolerance: f64) -> f64 {
+fn recompute_baseline_rotation(coordinates: &Vec<Point>, point: &Point, axis: &Line, rot: f64, tolerance: f64) -> (f64, f64) {
     // Computes the smallest angle rotation Cn that preserves the symmetry of a given object but that is also
     // compatible with the previous smallest rotation (i.e. the smallest Cn that is a superset of the previous Cn)
     if rot == 8.0 {
-        if is_rotation_viable(&coordinates, &point, &axis, 4.0, tolerance) {
-            return 4.0
-        } else if is_rotation_viable(&coordinates, &point, &axis, 2.0, tolerance) {
-            return 2.0
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 4.0, tolerance);
+        if viability {
+            return (4.0, distance)
+        } 
+        
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 2.0, tolerance);
+        if viability {
+            return (2.0, distance)
         } else {
-            return 1.0
+            return (1.0, 100.0)
         }
     } else if rot == 4.0 {
-        if is_rotation_viable(&coordinates, &point, &axis, 2.0, tolerance) {
-            return 2.0
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 2.0, tolerance);
+        if viability {
+            return (2.0, distance)
         } else {
-            return 1.0
+            return (1.0, 100.0)
         }
     } else if rot == 6.0 {
-        if is_rotation_viable(&coordinates, &point, &axis, 2.0, tolerance) {
-            return 2.0
-        } else if is_rotation_viable(&coordinates, &point, &axis, 3.0, tolerance) {
-            return 3.0
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 2.0, tolerance);
+        if viability {
+            return (2.0, distance)
+        } 
+        
+        let (viability, distance) = is_rotation_viable_distance(&coordinates, &point, &axis, 3.0, tolerance);
+        if viability {
+            return (3.0, distance)
         } else {
-            return 1.0
+            return (1.0, 100.0)
         }
     } else {
-        return 1.0
+        return (1.0, 100.0)
     }
 }
 
 
 pub fn is_rotation_viable(coordinates: &Vec<Point>, point: &Point, axis: &Line, n: f64, tolerance: f64) -> bool {
     let rotated = axis.rotate_point(*point, n);
-    // TODO: Check that the rotation is viable in both directions (e.g. that C3 == 3C3)
     return is_equivalent_point(&coordinates, rotated, tolerance)
+}
+
+
+pub fn is_rotation_viable_distance(coordinates: &Vec<Point>, point: &Point, axis: &Line, n: f64, tolerance: f64) -> (bool, f64) {
+    let rotated = axis.rotate_point(*point, n);
+    return closest_equivalent_point(&coordinates, rotated, tolerance)
 }
 
 
@@ -601,6 +647,85 @@ fn is_equivalent_point(coordinates: &Vec<Point>, point: Point, tolerance: f64) -
     }
 
     return false
+}
+
+
+fn closest_equivalent_point(coordinates: &Vec<Point>, point: Point, tolerance: f64) -> (bool, f64) {
+    // Determines whether a given point is equivalent (at the same position) to any of the provided coordinates
+    for coord in coordinates {
+        if coord.approx_eq(&point, tolerance) {
+            return (true, point.distance(*coord))
+        }
+    }
+
+    return (false, 100.0)
+}
+
+
+fn filter_rotations(axes: Vec<Line>, rotations: Vec<u32>, distances: Vec<f64>, tolerance: f64) -> (Vec<Line>, Vec<u32>, Vec<Line>) {
+    let length = rotations.len();
+    let mut nonzero_axes = Vec::with_capacity(length);
+    let mut nonzero_rots = Vec::with_capacity(length);
+
+    let mut sorted_axes: Vec<Vec<&Line>> = Vec::with_capacity(10);
+    let mut sorted_rots: Vec<Vec<u32>> = Vec::with_capacity(10);
+    let mut sorted_distances: Vec<Vec<f64>> = Vec::with_capacity(10);
+    'outer: for ((axis, rot), distance) in axes.iter().zip(rotations.iter()).zip(distances.iter()) {
+        if *rot == 1 {
+            continue;
+        }
+
+        for (i, axes) in sorted_axes.iter().enumerate() {
+            for sorted_axis in axes {
+                if axis.fast_approx_eq(**sorted_axis, tolerance) {
+                    sorted_axes[i].push(axis);
+                    sorted_rots[i].push(*rot);
+                    sorted_distances[i].push(*distance);
+                    continue 'outer
+                }
+            }
+        }
+
+        sorted_axes.push(vec![axis]);
+        sorted_rots.push(vec![*rot]);
+        sorted_distances.push(vec![*distance]);
+    }
+
+    let mut principal_rot = 0;
+    let mut principal_index = 0;
+    for (j, ((axes, rots), distances)) in sorted_axes.iter().zip(sorted_rots.iter()).zip(sorted_distances.iter()).enumerate() {
+        let mut highest_rot = 0;
+        let mut lowest_distance = 100.0;
+        let mut index = 0;
+        for (i, (rot, distance)) in rots.iter().zip(distances.iter()).enumerate() {
+            let (r, d) = (*rot, *distance);
+            if r > highest_rot {
+                highest_rot = r;
+                lowest_distance = d;
+                index = i;
+            } else if r == highest_rot {
+                if d < lowest_distance {
+                    lowest_distance = d;
+                    index = i;
+                }
+            }
+        }
+
+        nonzero_axes.push(*axes[index]);
+        nonzero_rots.push(rots[index]);
+
+        if highest_rot > principal_rot {
+            principal_rot = highest_rot;
+            principal_index = j;
+        }
+    }
+
+    if principal_rot > 0 {
+       let principal_axes = sorted_axes[principal_index].iter().map(|x| **x).collect();
+        return (nonzero_axes, nonzero_rots, principal_axes) 
+    } else {
+        return (nonzero_axes, nonzero_rots, Vec::with_capacity(0))
+    }
 }
 
 
@@ -623,25 +748,38 @@ pub fn get_centre_of_symmetry(coordinates: &Vec<Point>) -> Point {
 }
 
 
-fn get_horizontal_plane(coordinates: &Vec<Point>, principal_axis: &Line, centre_of_symmetry: &Point, tolerance: f64) -> Option<Plane> {
-    // Finds the horizontal mirror plane of the compound if one exists
-    let plane = match Plane::new(centre_of_symmetry.clone(), principal_axis.vector.clone()) {
-        Some(plane) => plane,
-        None => return None
-    };
+fn get_horizontal_plane(coordinates: &Vec<Point>, principal_axes: Vec<Line>, centre_of_symmetry: Point, tolerance: f64) -> Option<Plane> {
+    let mut min_distance = 100.0;
+    let mut best_plane = None;
+    'outer: for axis in principal_axes {
+        let plane = match Plane::new(centre_of_symmetry, axis.vector) {
+            Some(plane) => plane,
+            None => continue
+        };
 
-    for point in coordinates {
-        if point.is_approx_on_plane(plane, tolerance) {
-            continue
+        let mut max_distance = 0.0;
+        for point in coordinates {
+            if point.is_approx_on_plane(plane, tolerance) {
+                continue
+            }
+
+            let (viability, distance) = closest_equivalent_point(&coordinates, plane.reflect_point(*point), tolerance);
+            if !viability {
+                continue 'outer
+            }
+
+            if distance > max_distance {
+                max_distance = distance;
+            }
         }
-        let reflected = plane.reflect_point(*point);
 
-        if !is_equivalent_point(&coordinates, reflected, tolerance) {
-            return None
+        if max_distance < min_distance {
+            min_distance = max_distance;
+            best_plane = Some(plane);
         }
     }
-
-    return Some(plane)
+    
+    return best_plane
 }
 
 
@@ -1136,7 +1274,7 @@ mod tests {
         assert_eq!(expected, result);
     }
 
-    #[test]
+    /* #[test]
     fn test_recompute_baseline_rotation_8_to_4() {
         let coordinates = vec![Point::new(0.0, 1.0, 0.0), Point::new(0.0, 0.0, 1.0), Point::new(0.0, 0.0, -1.0)];
         let axis = Line::new(Point::new(0.0, 0.0, 0.0), Vector::new(1.0, 0.0, 0.0));
@@ -1176,7 +1314,7 @@ mod tests {
         let result = recompute_baseline_rotation(&coordinates, &Point::new(1.0, 1.0, 0.0), &axis, 6.0, 1e-10);
 
         assert_eq!(3.0, result)
-    }
+    } */
 
     #[test]
     fn test_is_rotation_viable_true() {

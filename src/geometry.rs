@@ -3238,10 +3238,10 @@ impl Plane {
                 normal += v1.cross_product(*v2)
             }
         }
-        normal = normal / length as f64;
+        normal = (normal / length as f64).normalise();
 
         if normal.x.abs() > tolerance || normal.y.abs() > tolerance || normal.z.abs() > tolerance {
-            return Some(Plane{point: centre, normal: normal.normalise()})
+            return Some(Plane{point: centre, normal: normal})
         } else {
             return None
         }
