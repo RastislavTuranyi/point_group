@@ -98,7 +98,7 @@ pub fn deviation_from_rotation_symmetry(coordinates: &Vec<Point>, axis: Line, n:
 pub fn distance_from_closest_point(coordinates: &Vec<Point>, point: Point) -> f64 {
     let mut diff = 100.0;
     for original in coordinates {
-        let distance = Vector::from_two_points(point, *original).magnitude();
+        let distance = point.distance(*original);
 
         if distance < diff {
             diff = distance

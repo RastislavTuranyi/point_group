@@ -115,7 +115,7 @@ pub fn find_point_group(coordinates: Vec<Point>, precision: u16, tolerance: f64)
 
     let number_of_c2 = rotations.iter().filter(|x| x == &&2_u32).count() as u32;
 
-    if number_of_c2 == highest_order_rotation || (highest_order_rotation == 2 && number_of_c2 == highest_order_rotation+1) {
+    if (highest_order_rotation > 2 && number_of_c2 == highest_order_rotation) || (highest_order_rotation == 2 && number_of_c2 == 3) {
         let principal_axis = rotation_axes[rotations.iter()
             .position(|x| x == &highest_order_rotation)
             .expect("We are searching for a value we have retrieved from here earlier")];
